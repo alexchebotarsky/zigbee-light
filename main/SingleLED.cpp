@@ -1,7 +1,5 @@
 #include "SingleLED.hpp"
 
-#include "driver/rmt_tx.h"
-
 SingleLED::SingleLED(const int gpio_pin)
     : gpio(static_cast<gpio_num_t>(gpio_pin)), led(NULL), brightness(1) {}
 
