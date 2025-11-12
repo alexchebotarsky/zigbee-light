@@ -3,7 +3,7 @@
 #include "driver/rmt_tx.h"
 
 SingleLED::SingleLED(const int gpio_pin)
-    : gpio(static_cast<gpio_num_t>(gpio_pin)), led(NULL) {}
+    : gpio(static_cast<gpio_num_t>(gpio_pin)), led(NULL), brightness(1) {}
 
 esp_err_t SingleLED::init() {
   led_strip_config_t led_config = {
@@ -31,13 +31,42 @@ esp_err_t SingleLED::init() {
   return ESP_OK;
 }
 
-esp_err_t SingleLED::set_color(uint32_t r, uint32_t g, uint32_t b) {
-  esp_err_t err = led_strip_set_pixel(led, 0, r, g, b);
+esp_err_t SingleLED::refresh() {
+  esp_err_t err = led_strip_set_pixel(led, 0, red * brightness,
+                                      green * brightness, blue * brightness);
   if (err != ESP_OK) {
     return err;
   }
 
   err = led_strip_refresh(led);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
+esp_err_t SingleLED::set_color(uint32_t r, uint32_t g, uint32_t b) {
+  red = r;
+  green = g;
+  blue = b;
+
+  esp_err_t err = refresh();
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
+esp_err_t SingleLED::set_brightness(float value) {
+  if (value > 1 || value < 0) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  brightness = value;
+
+  esp_err_t err = refresh();
   if (err != ESP_OK) {
     return err;
   }

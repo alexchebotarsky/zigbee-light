@@ -16,9 +16,11 @@ extern "C" void app_main(void) {
     esp_restart();
   }
 
+  led.set_brightness(0.01);
+
   while (true) {
     printf("Turning LED on\n");
-    led.set_color(255, 0, 0);
+    led.set_color(255, 255, 255);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     printf("Turning LED off\n");
