@@ -12,7 +12,10 @@ class SingleLED {
   esp_err_t init();
 
   esp_err_t set_color(uint32_t r, uint32_t g, uint32_t b);
-  esp_err_t set_brightness(float brightness);
+  esp_err_t set_brightness(float value);
+  esp_err_t transition_color(uint32_t r, uint32_t g, uint32_t b,
+                             uint32_t duration_ms);
+  esp_err_t transition_brightness(float value, uint32_t duration_ms);
 
  private:
   esp_err_t refresh();
