@@ -16,19 +16,14 @@ extern "C" void app_main(void) {
     esp_restart();
   }
 
-  led.set_brightness(0.05);
+  led.set_brightness(0.1);
 
   while (true) {
-    printf("Transitioning LED to red\n");
     led.transition_color(255, 0, 0, 1000);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-
-    printf("Transitioning LED to green\n");
+    led.transition_color(255, 255, 0, 1000);
     led.transition_color(0, 255, 0, 1000);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-
-    printf("Transitioning LED to blue\n");
+    led.transition_color(0, 255, 255, 1000);
     led.transition_color(0, 0, 255, 1000);
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    led.transition_color(255, 0, 255, 1000);
   }
 }

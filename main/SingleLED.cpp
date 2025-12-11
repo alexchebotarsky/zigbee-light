@@ -102,13 +102,18 @@ esp_err_t SingleLED::transition_color(uint32_t r, uint32_t g, uint32_t b,
     return ESP_ERR_INVALID_ARG;
   }
 
+  // Validate duration
+  if (duration_ms < 100 || duration_ms % 100 != 0) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
   esp_err_t err;
 
   float initial_r = red;
   float initial_g = green;
   float initial_b = blue;
 
-  const int steps = 254;
+  const int steps = 100;
   const int delay_ms = duration_ms / steps;
 
   for (int i = 0; i <= steps; i++) {
