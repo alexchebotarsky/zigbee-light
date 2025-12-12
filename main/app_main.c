@@ -1,31 +1,16 @@
-/*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: CC0-1.0
- *
- * Zigbee HA_on_off_light Example
- *
- * This example code is in the Public Domain (or CC0 licensed, at your option.)
- *
- * Unless required by applicable law or agreed to in writing, this
- * software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either express or implied.
- */
-#include "esp_zb_light.h"
-
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_zigbee_core.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ha/esp_zigbee_ha_standard.h"
+#include "light_driver.h"
 #include "nvs_flash.h"
 
-#if !defined ZB_ED_ROLE
-#error Define ZB_ED_ROLE in idf.py menuconfig to compile light (End Device) source code.
-#endif
+const uint8_t LIGHT_ENDPOINT = 10;
 
 static const char* TAG = "ESP_ZB_ON_OFF_LIGHT";
-/********************* Define functions **************************/
+
 static esp_err_t deferred_driver_init(void) {
   static bool is_inited = false;
   if (!is_inited) {
@@ -115,7 +100,7 @@ static esp_err_t zb_attribute_handler(
            "data size(%d)",
            message->info.dst_endpoint, message->info.cluster,
            message->attribute.id, message->attribute.data.size);
-  if (message->info.dst_endpoint == HA_ESP_LIGHT_ENDPOINT) {
+  if (message->info.dst_endpoint == LIGHT_ENDPOINT) {
     if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF) {
       if (message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID &&
           message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_BOOL) {
@@ -144,33 +129,120 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id,
   return ret;
 }
 
-static void esp_zb_task(void* pvParameters) {
-  /* initialize Zigbee stack */
-  esp_zb_cfg_t zb_nwk_cfg = ESP_ZB_ZED_CONFIG();
-  esp_zb_init(&zb_nwk_cfg);
-  esp_zb_on_off_light_cfg_t light_cfg = ESP_ZB_DEFAULT_ON_OFF_LIGHT_CONFIG();
-  esp_zb_ep_list_t* esp_zb_on_off_light_ep =
-      esp_zb_on_off_light_ep_create(HA_ESP_LIGHT_ENDPOINT, &light_cfg);
-  zcl_basic_manufacturer_info_t info = {
-      .manufacturer_name = ESP_MANUFACTURER_NAME,
-      .model_identifier = ESP_MODEL_IDENTIFIER,
-  };
+static esp_err_t set_basic_info(esp_zb_ep_list_t* ep_list, uint8_t endpoint_id,
+                                const char* manufacturer, const char* model) {
+  esp_zb_cluster_list_t* cluster_list =
+      esp_zb_ep_list_get_ep(ep_list, endpoint_id);
+  if (!cluster_list) {
+    return ESP_ERR_INVALID_ARG;
+  }
 
-  esp_zcl_utility_add_ep_basic_manufacturer_info(esp_zb_on_off_light_ep,
-                                                 HA_ESP_LIGHT_ENDPOINT, &info);
-  esp_zb_device_register(esp_zb_on_off_light_ep);
+  esp_zb_attribute_list_t* basic_cluster =
+      esp_zb_cluster_list_get_cluster(cluster_list, ESP_ZB_ZCL_CLUSTER_ID_BASIC,
+                                      ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+  if (!basic_cluster) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  static char manufacturer_buf[32];
+  static char model_buf[32];
+
+  uint8_t manufacturer_len = strlen(manufacturer);
+  uint8_t model_len = strlen(model);
+
+  if (manufacturer_len > sizeof(manufacturer_buf) - 1 ||
+      model_len > sizeof(model_buf) - 1) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  manufacturer_buf[0] = manufacturer_len;
+  memcpy(&manufacturer_buf[1], manufacturer, manufacturer_len);
+
+  esp_err_t err = esp_zb_basic_cluster_add_attr(
+      basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID,
+      manufacturer_buf);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  model_buf[0] = model_len;
+  memcpy(&model_buf[1], model, model_len);
+
+  err = esp_zb_basic_cluster_add_attr(
+      basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, model_buf);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
+static void esp_zb_task(void* pvParameters) {
+  esp_zb_cfg_t zigbee_config = {
+      .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,
+      .install_code_policy = false,
+      .nwk_cfg.zed_cfg =
+          {
+              .ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_64MIN,
+              .keep_alive = 3000,  // ms
+          },
+  };
+  esp_zb_init(&zigbee_config);
+
+  const uint8_t LIGHT_ENDPOINT = 10;
+
+  esp_zb_on_off_light_cfg_t light_config = ESP_ZB_DEFAULT_ON_OFF_LIGHT_CONFIG();
+  esp_zb_ep_list_t* light_ep =
+      esp_zb_on_off_light_ep_create(LIGHT_ENDPOINT, &light_config);
+
+  const char* MANUFACTURER = "Alex Chebotarsky";
+  const char* MODEL = "my_zigbee_device";
+
+  esp_err_t err = set_basic_info(light_ep, LIGHT_ENDPOINT, MANUFACTURER, MODEL);
+  if (err != ESP_OK) {
+    printf("Error setting basic info: %s\n", esp_err_to_name(err));
+    esp_restart();
+  }
+
+  err = esp_zb_device_register(light_ep);
+  if (err != ESP_OK) {
+    printf("Error registering Zigbee device: %s\n", esp_err_to_name(err));
+    esp_restart();
+  }
+
   esp_zb_core_action_handler_register(zb_action_handler);
-  esp_zb_set_primary_network_channel_set(ESP_ZB_PRIMARY_CHANNEL_MASK);
-  ESP_ERROR_CHECK(esp_zb_start(false));
+
+  err = esp_zb_start(false);
+  if (err != ESP_OK) {
+    printf("Error starting Zigbee stack: %s\n", esp_err_to_name(err));
+    esp_restart();
+  }
+
   esp_zb_stack_main_loop();
 }
 
 void app_main(void) {
-  esp_zb_platform_config_t config = {
-      .radio_config = ESP_ZB_DEFAULT_RADIO_CONFIG(),
-      .host_config = ESP_ZB_DEFAULT_HOST_CONFIG(),
+  esp_err_t err = nvs_flash_init();
+  if (err != ESP_OK) {
+    printf("Error initializing NVS: %s\n", esp_err_to_name(err));
+    esp_restart();
+  }
+
+  esp_zb_platform_config_t platform_config = {
+      .radio_config =
+          {
+              .radio_mode = ZB_RADIO_MODE_NATIVE,
+          },
+      .host_config =
+          {
+              .host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE,
+          },
   };
-  ESP_ERROR_CHECK(nvs_flash_init());
-  ESP_ERROR_CHECK(esp_zb_platform_config(&config));
+  err = esp_zb_platform_config(&platform_config);
+  if (err != ESP_OK) {
+    printf("Error configuring Zigbee platform: %s\n", esp_err_to_name(err));
+    esp_restart();
+  }
+
   xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);
 }
