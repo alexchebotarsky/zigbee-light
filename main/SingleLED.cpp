@@ -8,12 +8,17 @@
 SingleLED::SingleLED(const int gpio_pin)
     : gpio(static_cast<gpio_num_t>(gpio_pin)),
       led(NULL),
+      is_initialized(false),
       red(0),
       green(0),
       blue(0),
       brightness(1) {}
 
 esp_err_t SingleLED::init() {
+  if (is_initialized) {
+    return ESP_OK;
+  }
+
   led_strip_config_t led_config = {
       .strip_gpio_num = gpio,
       .max_leds = 1,
@@ -35,6 +40,8 @@ esp_err_t SingleLED::init() {
   if (err != ESP_OK) {
     return err;
   }
+
+  is_initialized = true;
 
   return ESP_OK;
 }

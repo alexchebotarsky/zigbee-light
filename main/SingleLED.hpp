@@ -22,6 +22,7 @@ class SingleLED {
 
   const gpio_num_t gpio;
   led_strip_handle_t led;
+  bool is_initialized;
   uint32_t red;
   uint32_t green;
   uint32_t blue;
