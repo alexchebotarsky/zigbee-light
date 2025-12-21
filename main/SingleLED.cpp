@@ -7,18 +7,13 @@
 
 SingleLED::SingleLED(const int gpio_pin)
     : gpio(static_cast<gpio_num_t>(gpio_pin)),
-      led(NULL),
-      is_initialized(false),
+      led(nullptr),
       red(0),
       green(0),
       blue(0),
       brightness(1) {}
 
 esp_err_t SingleLED::init() {
-  if (is_initialized) {
-    return ESP_OK;
-  }
-
   led_strip_config_t led_config = {
       .strip_gpio_num = gpio,
       .max_leds = 1,
@@ -41,31 +36,11 @@ esp_err_t SingleLED::init() {
     return err;
   }
 
-  is_initialized = true;
-
-  return ESP_OK;
-}
-
-esp_err_t SingleLED::refresh() {
-  uint32_t r = round(red * brightness);
-  uint32_t g = round(green * brightness);
-  uint32_t b = round(blue * brightness);
-
-  esp_err_t err = led_strip_set_pixel(led, 0, r, g, b);
-  if (err != ESP_OK) {
-    return err;
-  }
-
-  err = led_strip_refresh(led);
-  if (err != ESP_OK) {
-    return err;
-  }
-
   return ESP_OK;
 }
 
 esp_err_t SingleLED::set_color(uint32_t r, uint32_t g, uint32_t b) {
-  if (r > 255 || g > 255 || b > 255) {
+  if (!is_valid_color(r, g, b)) {
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -83,7 +58,7 @@ esp_err_t SingleLED::set_color(uint32_t r, uint32_t g, uint32_t b) {
 
 esp_err_t SingleLED::set_brightness(float value) {
   // Validate input brightness value
-  if (value > 1 || value < 0) {
+  if (!is_valid_brightness(value)) {
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -105,12 +80,15 @@ esp_err_t SingleLED::transition_color(uint32_t r, uint32_t g, uint32_t b,
   }
 
   // Validate input colors
-  if (r > 255 || g > 255 || b > 255) {
+  if (!is_valid_color(r, g, b)) {
     return ESP_ERR_INVALID_ARG;
   }
 
-  // Validate duration
-  if (duration_ms < 100 || duration_ms % 100 != 0) {
+  const int steps = 100;
+
+  // Duration must be divisible by steps in whole, otherwise it leads to uneven
+  // transitions.
+  if (duration_ms % steps != 0) {
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -120,7 +98,6 @@ esp_err_t SingleLED::transition_color(uint32_t r, uint32_t g, uint32_t b,
   float initial_g = green;
   float initial_b = blue;
 
-  const int steps = 100;
   const int delay_ms = duration_ms / steps;
 
   for (int i = 0; i <= steps; i++) {
@@ -148,7 +125,7 @@ esp_err_t SingleLED::transition_brightness(float value, uint32_t duration_ms) {
   }
 
   // Validate input brightness value
-  if (value > 1 || value < 0) {
+  if (!is_valid_brightness(value)) {
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -172,4 +149,30 @@ esp_err_t SingleLED::transition_brightness(float value, uint32_t duration_ms) {
   }
 
   return ESP_OK;
+}
+
+esp_err_t SingleLED::refresh() {
+  uint32_t r = static_cast<uint32_t>(round(red * brightness));
+  uint32_t g = static_cast<uint32_t>(round(green * brightness));
+  uint32_t b = static_cast<uint32_t>(round(blue * brightness));
+
+  esp_err_t err = led_strip_set_pixel(led, 0, r, g, b);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  err = led_strip_refresh(led);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
+bool SingleLED::is_valid_color(uint32_t r, uint32_t g, uint32_t b) {
+  return (r <= 255) && (g <= 255) && (b <= 255);
+}
+
+bool SingleLED::is_valid_brightness(float value) {
+  return (value >= 0.0f) && (value <= 1.0f);
 }

@@ -20,9 +20,11 @@ class SingleLED {
  private:
   esp_err_t refresh();
 
+  static bool is_valid_color(uint32_t r, uint32_t g, uint32_t b);
+  static bool is_valid_brightness(float value);
+
   const gpio_num_t gpio;
   led_strip_handle_t led;
-  bool is_initialized;
   uint32_t red;
   uint32_t green;
   uint32_t blue;
