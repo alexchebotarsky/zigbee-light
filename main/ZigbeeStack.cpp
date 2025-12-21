@@ -126,44 +126,42 @@ AttributeKey ZigbeeStack::make_attribute_key(uint8_t endpoint_id,
 }
 
 // GLOBAL ZIGBEE SIGNAL HANDLER
-static void start_top_level_commissioning(uint8_t mode_mask) {
-  esp_err_t err = esp_zb_bdb_start_top_level_commissioning(mode_mask);
-  if (err != ESP_OK) {
-    printf("Error starting top level commissioning: %s\n",
-           esp_err_to_name(err));
-  }
-}
-
 extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct) {
   esp_zb_app_signal_type_t sig_type =
       static_cast<esp_zb_app_signal_type_t>(*signal_struct->p_app_signal);
   esp_err_t err = signal_struct->esp_err_status;
 
+  esp_zb_callback_t start_commissioning = [](uint8_t mode_mask) {
+    esp_err_t err = esp_zb_bdb_start_top_level_commissioning(mode_mask);
+    if (err != ESP_OK) {
+      printf("Error starting top level commissioning: %s\n",
+             esp_err_to_name(err));
+    }
+  };
+
   switch (sig_type) {
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
       printf("Initializing Zigbee stack\n");
-      start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
+      start_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
       break;
     case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
     case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
       if (err != ESP_OK) {
         printf("Restarting Zigbee stack: %s\n", esp_err_to_name(err));
-        esp_zb_scheduler_alarm(
-            reinterpret_cast<esp_zb_callback_t>(start_top_level_commissioning),
-            ESP_ZB_BDB_MODE_INITIALIZATION, 1000);
+        esp_zb_scheduler_alarm(start_commissioning,
+                               ESP_ZB_BDB_MODE_INITIALIZATION, 1000);
         break;
       }
       if (esp_zb_bdb_is_factory_new()) {
         printf("Starting network steering for factory new device\n");
-        start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
+        start_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
       }
       break;
     case ESP_ZB_BDB_SIGNAL_STEERING:
       if (err != ESP_OK) {
         printf("Restarting network steering: %s\n", esp_err_to_name(err));
-        esp_zb_scheduler_alarm(
-            reinterpret_cast<esp_zb_callback_t>(start_top_level_commissioning),
-            ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
+        esp_zb_scheduler_alarm(start_commissioning,
+                               ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
         break;
       }
       printf("Joined network successfully!\n");
