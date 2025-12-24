@@ -74,8 +74,6 @@ void ZigbeeStack::task(void* pvParameters) {
   };
   esp_zb_init(&zigbee_config);
 
-  esp_zb_core_action_handler_register(action_handler);
-
   esp_err_t err;
   for (const auto& device : Zigbee.devices) {
     err = esp_zb_device_register(device);
@@ -84,6 +82,8 @@ void ZigbeeStack::task(void* pvParameters) {
       return;
     }
   }
+
+  esp_zb_core_action_handler_register(action_handler);
 
   err = esp_zb_start(false);
   if (err != ESP_OK) {
