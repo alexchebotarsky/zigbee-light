@@ -1,29 +1,40 @@
 #ifndef ZIGBEE_STACK_HPP
 #define ZIGBEE_STACK_HPP
 
+#include <functional>
 #include <unordered_map>
-#include <vector>
 
 #include "esp_zigbee_core.h"
 
-using AttributeKey = uint64_t;
-using ActionCallback =
-    esp_err_t (*)(const esp_zb_zcl_set_attr_value_message_t*);
+using ActionKey = uint64_t;
+using ActionHandler = std::function<esp_err_t(const void*)>;
+
+struct ZigbeeCommonMessage {
+  esp_zb_device_cb_common_info_t info;
+};
 
 class ZigbeeStack {
  public:
   esp_err_t init();
   esp_err_t start();
-  void register_device(esp_zb_ep_list_t* device);
-  void on_attribute_action(uint8_t endpoint_id, uint16_t cluster_id,
-                           uint16_t attribute_id, ActionCallback callback);
+  esp_err_t register_endpoint(esp_zb_endpoint_config_t config,
+                              esp_zb_cluster_list_t* clusters);
+
+  template <typename T>
+  void handle_action(esp_zb_core_action_callback_id_t callback_id,
+                     uint8_t endpoint_id, uint16_t cluster_id,
+                     esp_err_t (*handler)(const T*)) {
+    ActionKey key = make_action_key(callback_id, endpoint_id, cluster_id);
+    action_handlers.insert_or_assign(key, [handler](const void* msg) {
+      return handler(static_cast<const T*>(msg));
+    });
+  }
 
   static void task(void* pvParameters);
-  static esp_err_t action_handler(esp_zb_core_action_callback_id_t callback_id,
-                                  const void* message);
-  static AttributeKey make_attribute_key(uint8_t endpoint_id,
-                                         uint16_t cluster_id,
-                                         uint16_t attribute_id);
+  static esp_err_t core_action_handler(
+      esp_zb_core_action_callback_id_t callback_id, const void* message);
+  static ActionKey make_action_key(esp_zb_core_action_callback_id_t callback_id,
+                                   uint8_t endpoint_id, uint16_t cluster_id);
 
   // Singleton instance accessor
   static ZigbeeStack& instance();
@@ -40,8 +51,9 @@ class ZigbeeStack {
   // Private constructor for singleton pattern
   ZigbeeStack();
 
-  std::vector<esp_zb_ep_list_t*> devices;
-  std::unordered_map<AttributeKey, ActionCallback> attribute_handlers;
+  bool initialized;
+  esp_zb_ep_list_t* endpoints;
+  std::unordered_map<ActionKey, ActionHandler> action_handlers;
 };
 
 extern ZigbeeStack& Zigbee;

@@ -11,7 +11,8 @@ constexpr int TASK_PRIORITY = 5;
 ZigbeeStack& Zigbee = ZigbeeStack::instance();
 
 // Private singleton constructor
-ZigbeeStack::ZigbeeStack() {}
+ZigbeeStack::ZigbeeStack()
+    : initialized(false), endpoints(esp_zb_ep_list_create()) {}
 
 // Singleton instance accessor
 ZigbeeStack& ZigbeeStack::instance() {
@@ -21,6 +22,10 @@ ZigbeeStack& ZigbeeStack::instance() {
 
 // PUBLIC METHODS
 esp_err_t ZigbeeStack::init() {
+  if (initialized) {
+    return ESP_OK;
+  }
+
   esp_zb_platform_config_t platform_config = {
       .radio_config =
           {
@@ -38,6 +43,8 @@ esp_err_t ZigbeeStack::init() {
     return err;
   }
 
+  initialized = true;
+
   return ESP_OK;
 }
 
@@ -47,20 +54,19 @@ esp_err_t ZigbeeStack::start() {
   return (result == pdPASS) ? ESP_OK : ESP_FAIL;
 }
 
-void ZigbeeStack::register_device(esp_zb_ep_list_t* device) {
-  devices.push_back(device);
-}
+esp_err_t ZigbeeStack::register_endpoint(esp_zb_endpoint_config_t config,
+                                         esp_zb_cluster_list_t* clusters) {
+  esp_err_t err = esp_zb_ep_list_add_ep(endpoints, clusters, config);
+  if (err != ESP_OK) {
+    return err;
+  }
 
-void ZigbeeStack::on_attribute_action(uint8_t endpoint_id, uint16_t cluster_id,
-                                      uint16_t attribute_id,
-                                      ActionCallback callback) {
-  AttributeKey key = make_attribute_key(endpoint_id, cluster_id, attribute_id);
-  attribute_handlers.insert_or_assign(key, callback);
+  return ESP_OK;
 }
 
 // STATIC METHODS
 void ZigbeeStack::task(void* pvParameters) {
-  esp_zb_cfg_t zigbee_config = {
+  esp_zb_cfg_t zigbee_cfg = {
       .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,
       .install_code_policy = false,
       .nwk_cfg =
@@ -72,18 +78,15 @@ void ZigbeeStack::task(void* pvParameters) {
                   },
           },
   };
-  esp_zb_init(&zigbee_config);
+  esp_zb_init(&zigbee_cfg);
 
-  esp_err_t err;
-  for (const auto& device : Zigbee.devices) {
-    err = esp_zb_device_register(device);
-    if (err != ESP_OK) {
-      printf("Error registering Zigbee device: %s\n", esp_err_to_name(err));
-      return;
-    }
+  esp_err_t err = esp_zb_device_register(Zigbee.endpoints);
+  if (err != ESP_OK) {
+    printf("Error registering Zigbee endpoints: %s\n", esp_err_to_name(err));
+    return;
   }
 
-  esp_zb_core_action_handler_register(action_handler);
+  esp_zb_core_action_handler_register(core_action_handler);
 
   err = esp_zb_start(false);
   if (err != ESP_OK) {
@@ -94,35 +97,28 @@ void ZigbeeStack::task(void* pvParameters) {
   esp_zb_stack_main_loop();
 }
 
-esp_err_t ZigbeeStack::action_handler(
+esp_err_t ZigbeeStack::core_action_handler(
     esp_zb_core_action_callback_id_t callback_id, const void* msg) {
-  switch (callback_id) {
-    case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID: {
-      const auto* attr_msg =
-          static_cast<const esp_zb_zcl_set_attr_value_message_t*>(msg);
+  const auto* common = static_cast<const ZigbeeCommonMessage*>(msg);
 
-      AttributeKey key =
-          make_attribute_key(attr_msg->info.dst_endpoint,
-                             attr_msg->info.cluster, attr_msg->attribute.id);
+  ActionKey key = make_action_key(callback_id, common->info.dst_endpoint,
+                                  common->info.cluster);
 
-      const auto iter = Zigbee.attribute_handlers.find(key);
-      if (iter != Zigbee.attribute_handlers.end()) {
-        auto& [_, callback] = *iter;
-        return callback(attr_msg);
-      }
-      return ESP_ERR_NOT_SUPPORTED;
-    }
-    default:
-      return ESP_ERR_NOT_SUPPORTED;
+  const auto iter = Zigbee.action_handlers.find(key);
+  if (iter != Zigbee.action_handlers.end()) {
+    auto& [_, handler] = *iter;
+    return handler(msg);
   }
+
+  return ESP_ERR_NOT_SUPPORTED;
 }
 
-AttributeKey ZigbeeStack::make_attribute_key(uint8_t endpoint_id,
-                                             uint16_t cluster_id,
-                                             uint16_t attribute_id) {
-  return (static_cast<uint64_t>(endpoint_id) << 32) |
-         (static_cast<uint64_t>(cluster_id) << 16) |
-         static_cast<uint64_t>(attribute_id);
+ActionKey ZigbeeStack::make_action_key(
+    esp_zb_core_action_callback_id_t callback_id, uint8_t endpoint_id,
+    uint16_t cluster_id) {
+  return (static_cast<uint64_t>(callback_id) << 24) |
+         (static_cast<uint64_t>(endpoint_id) << 16) |
+         static_cast<uint64_t>(cluster_id);
 }
 
 // GLOBAL ZIGBEE SIGNAL HANDLER
