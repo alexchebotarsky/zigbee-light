@@ -12,7 +12,7 @@ ZigbeeStack& Zigbee = ZigbeeStack::instance();
 
 // Private singleton constructor
 ZigbeeStack::ZigbeeStack()
-    : initialized(false), endpoints(esp_zb_ep_list_create()) {}
+    : endpoints(esp_zb_ep_list_create()), action_handlers() {}
 
 // Singleton instance accessor
 ZigbeeStack& ZigbeeStack::instance() {
@@ -22,10 +22,6 @@ ZigbeeStack& ZigbeeStack::instance() {
 
 // PUBLIC METHODS
 esp_err_t ZigbeeStack::init() {
-  if (initialized) {
-    return ESP_OK;
-  }
-
   esp_zb_platform_config_t platform_config = {
       .radio_config =
           {
@@ -43,7 +39,7 @@ esp_err_t ZigbeeStack::init() {
     return err;
   }
 
-  initialized = true;
+  esp_zb_core_action_handler_register(core_action_handler);
 
   return ESP_OK;
 }
@@ -64,7 +60,7 @@ esp_err_t ZigbeeStack::register_endpoint(esp_zb_endpoint_config_t config,
   return ESP_OK;
 }
 
-// STATIC METHODS
+// PRIVATE METHODS
 void ZigbeeStack::task(void* pvParameters) {
   esp_zb_cfg_t zigbee_cfg = {
       .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,
@@ -86,8 +82,6 @@ void ZigbeeStack::task(void* pvParameters) {
     return;
   }
 
-  esp_zb_core_action_handler_register(core_action_handler);
-
   err = esp_zb_start(false);
   if (err != ESP_OK) {
     printf("Error starting Zigbee stack: %s\n", esp_err_to_name(err));
@@ -99,7 +93,7 @@ void ZigbeeStack::task(void* pvParameters) {
 
 esp_err_t ZigbeeStack::core_action_handler(
     esp_zb_core_action_callback_id_t callback_id, const void* msg) {
-  const auto* common = static_cast<const ZigbeeCommonMessage*>(msg);
+  const auto* common = static_cast<const ActionCommonMessage*>(msg);
 
   ActionKey key = make_action_key(callback_id, common->info.dst_endpoint,
                                   common->info.cluster);
