@@ -1,6 +1,9 @@
 #include "LightDevice.hpp"
 
-LightDevice::LightDevice() {}
+constexpr const uint32_t APP_DEVICE_VERSION = 1;
+
+// PUBLIC METHODS
+LightDevice::LightDevice(const LightConfig config) : config(config) {}
 
 esp_err_t LightDevice::init() {
   clusters = esp_zb_zcl_cluster_list_create();
@@ -8,9 +11,24 @@ esp_err_t LightDevice::init() {
   // Basic cluster (required)
   esp_zb_basic_cluster_cfg_t basic_cfg = {
       .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-      .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
+      .power_source = config.power_source,
   };
   auto* basic_attrs = esp_zb_basic_cluster_create(&basic_cfg);
+
+  if (config.manufacturer != nullptr) {
+    char manufacturer[32];
+    make_attr_string(config.manufacturer, manufacturer, sizeof(manufacturer));
+    esp_zb_basic_cluster_add_attr(
+        basic_attrs, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, manufacturer);
+  }
+
+  if (config.model != nullptr) {
+    char model[32];
+    make_attr_string(config.model, model, sizeof(model));
+    esp_zb_basic_cluster_add_attr(
+        basic_attrs, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, model);
+  }
+
   esp_err_t err = esp_zb_cluster_list_add_basic_cluster(
       clusters, basic_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
   if (err != ESP_OK) {
@@ -42,15 +60,26 @@ esp_err_t LightDevice::init() {
   return ESP_OK;
 }
 
-esp_zb_endpoint_config_t LightDevice::make_endpoint_config(
-    uint8_t endpoint_id) {
-  esp_zb_endpoint_config_t config = {};
-  config.endpoint = endpoint_id;
-  config.app_profile_id = ESP_ZB_AF_HA_PROFILE_ID;
-  config.app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID;
-  config.app_device_version = 1;
-
-  return config;
+esp_zb_endpoint_config_t LightDevice::get_endpoint_config() {
+  esp_zb_endpoint_config_t endpoint_config = {
+      .endpoint = config.endpoint_id,
+      .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+      .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
+      .app_device_version = APP_DEVICE_VERSION,
+  };
+  return endpoint_config;
 }
 
 esp_zb_cluster_list_t* LightDevice::get_clusters() { return clusters; }
+
+// PRIVATE METHODS
+void LightDevice::make_attr_string(const char* str, char* buf, size_t buf_len) {
+  if (str == nullptr) {
+    buf[0] = 0;
+    return;
+  }
+
+  size_t len = std::min(strlen(str), buf_len - 1);
+  buf[0] = static_cast<uint8_t>(len);
+  memcpy(&buf[1], str, len);
+}

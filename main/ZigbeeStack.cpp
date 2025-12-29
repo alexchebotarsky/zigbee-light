@@ -11,8 +11,7 @@ constexpr int TASK_PRIORITY = 5;
 ZigbeeStack& Zigbee = ZigbeeStack::instance();
 
 // Private singleton constructor
-ZigbeeStack::ZigbeeStack()
-    : endpoints(esp_zb_ep_list_create()), action_handlers() {}
+ZigbeeStack::ZigbeeStack() {}
 
 // Singleton instance accessor
 ZigbeeStack& ZigbeeStack::instance() {
@@ -22,6 +21,8 @@ ZigbeeStack& ZigbeeStack::instance() {
 
 // PUBLIC METHODS
 esp_err_t ZigbeeStack::init() {
+  endpoints = esp_zb_ep_list_create();
+
   esp_zb_platform_config_t platform_config = {
       .radio_config =
           {
@@ -50,9 +51,9 @@ esp_err_t ZigbeeStack::start() {
   return (result == pdPASS) ? ESP_OK : ESP_FAIL;
 }
 
-esp_err_t ZigbeeStack::register_endpoint(esp_zb_endpoint_config_t config,
-                                         esp_zb_cluster_list_t* clusters) {
-  esp_err_t err = esp_zb_ep_list_add_ep(endpoints, clusters, config);
+esp_err_t ZigbeeStack::register_endpoint(
+    esp_zb_endpoint_config_t endpoint_config, esp_zb_cluster_list_t* clusters) {
+  esp_err_t err = esp_zb_ep_list_add_ep(endpoints, clusters, endpoint_config);
   if (err != ESP_OK) {
     return err;
   }

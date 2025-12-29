@@ -9,9 +9,12 @@
 constexpr const int INBUILT_LED_PIN = 8;
 SingleLED led(INBUILT_LED_PIN);
 
-LightDevice light_device;
-
-constexpr uint8_t LIGHT_ENDPOINT = 10;
+LightDevice device(LightConfig{
+    .endpoint_id = 10,
+    .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
+    .manufacturer = "Alex Chebotarsky",
+    .model = "Zigbee Light Device",
+});
 
 extern "C" void app_main(void) {
   esp_err_t err = nvs_flash_init();
@@ -32,23 +35,21 @@ extern "C" void app_main(void) {
     return;
   }
 
-  err = light_device.init();
+  err = device.init();
   if (err != ESP_OK) {
     printf("Error initializing LightDevice: %s\n", esp_err_to_name(err));
     return;
   }
 
-  err = Zigbee.register_endpoint(
-      light_device.make_endpoint_config(LIGHT_ENDPOINT),
-      light_device.get_clusters());
+  err = Zigbee.register_endpoint(device.get_endpoint_config(),
+                                 device.get_clusters());
   if (err != ESP_OK) {
-    printf("Error registering light endpoint: %s\n", esp_err_to_name(err));
+    printf("Error registering device endpoint: %s\n", esp_err_to_name(err));
     return;
   }
 
   Zigbee.handle_action(
-      ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, LIGHT_ENDPOINT,
-      ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
+      ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, 10, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
       [](const esp_zb_zcl_set_attr_value_message_t* msg) {
         switch (msg->attribute.id) {
           case ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID: {
