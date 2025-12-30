@@ -9,7 +9,7 @@
 constexpr const int INBUILT_LED_PIN = 8;
 SingleLED led(INBUILT_LED_PIN);
 
-LightDevice device(LightConfig{
+LightDevice light_device(LightConfig{
     .endpoint_id = 10,
     .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
     .manufacturer = "Alex Chebotarsky",
@@ -35,36 +35,28 @@ extern "C" void app_main(void) {
     return;
   }
 
-  err = device.init();
+  err = light_device.init();
   if (err != ESP_OK) {
     printf("Error initializing LightDevice: %s\n", esp_err_to_name(err));
     return;
   }
 
-  err = Zigbee.register_endpoint(device.get_endpoint_config(),
-                                 device.get_clusters());
+  err = Zigbee.register_endpoint(light_device.get_endpoint_config(),
+                                 light_device.get_clusters());
   if (err != ESP_OK) {
-    printf("Error registering device endpoint: %s\n", esp_err_to_name(err));
+    printf("Error registering light endpoint: %s\n", esp_err_to_name(err));
     return;
   }
 
-  Zigbee.handle_action(
-      ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, 10, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
+  light_device.handle_attribute(
+      ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
       [](const esp_zb_zcl_set_attr_value_message_t* msg) {
-        switch (msg->attribute.id) {
-          case ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID: {
-            bool set_state =
-                *static_cast<const bool*>(msg->attribute.data.value);
-            printf("Setting light to %s\n", set_state ? "ON" : "OFF");
-            if (set_state) {
-              return led.transition_color(255, 255, 255, 1000);
-            } else {
-              return led.transition_color(0, 0, 0, 1000);
-            }
-          }
-          default:
-            printf("Unsupported attribute type %d\n", msg->attribute.id);
-            return ESP_ERR_NOT_SUPPORTED;
+        bool set_state = *static_cast<const bool*>(msg->attribute.data.value);
+        printf("Setting light to %s\n", set_state ? "ON" : "OFF");
+        if (set_state) {
+          return led.transition_color(255, 255, 255, 1000);
+        } else {
+          return led.transition_color(0, 0, 0, 1000);
         }
       });
 

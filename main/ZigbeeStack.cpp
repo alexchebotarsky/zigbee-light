@@ -105,6 +105,9 @@ esp_err_t ZigbeeStack::core_action_handler(
     return handler(msg);
   }
 
+  printf("Unhandled action: callback_id=%lu, endpoint=%u, cluster=%u\n",
+         static_cast<uint32_t>(callback_id), common->info.dst_endpoint,
+         static_cast<uint16_t>(common->info.cluster));
   return ESP_ERR_NOT_SUPPORTED;
 }
 
@@ -147,6 +150,7 @@ extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct) {
         printf("Starting network steering for factory new device\n");
         start_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
       }
+      printf("Zigbee stack is running\n");
       break;
     case ESP_ZB_BDB_SIGNAL_STEERING:
       if (err != ESP_OK) {

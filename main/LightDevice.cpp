@@ -57,6 +57,18 @@ esp_err_t LightDevice::init() {
     return err;
   }
 
+  Zigbee.handle_action(ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, config.endpoint_id,
+                       ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
+                       [this](const esp_zb_zcl_set_attr_value_message_t* msg) {
+                         const auto iter =
+                             this->attribute_handlers.find(msg->attribute.id);
+                         if (iter != this->attribute_handlers.end()) {
+                           auto& [_, handler] = *iter;
+                           return handler(msg);
+                         }
+                         return ESP_OK;
+                       });
+
   return ESP_OK;
 }
 
