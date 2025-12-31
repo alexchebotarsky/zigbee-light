@@ -48,15 +48,23 @@ extern "C" void app_main(void) {
     return;
   }
 
-  light_device.handle_attribute(
-      ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
-      [](const esp_zb_zcl_set_attr_value_message_t* msg) {
-        bool set_state = *static_cast<const bool*>(msg->attribute.data.value);
-        printf("Setting light to %s\n", set_state ? "ON" : "OFF");
-        if (set_state) {
-          return led.transition_color(255, 255, 255, 1000);
-        } else {
-          return led.transition_color(0, 0, 0, 1000);
+  light_device.handle_action<esp_zb_zcl_set_attr_value_message_t>(
+      ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, [](const auto* msg) {
+        switch (msg->attribute.id) {
+          case ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID: {
+            bool set_state =
+                *static_cast<const bool*>(msg->attribute.data.value);
+            printf("Setting light to %s\n", set_state ? "ON" : "OFF");
+            if (set_state) {
+              return led.transition_color(255, 255, 255, 1000);
+            } else {
+              return led.transition_color(0, 0, 0, 1000);
+            }
+            break;
+          }
+          default:
+            printf("Unsupported attribute ID: %u\n", msg->attribute.id);
+            return ESP_ERR_NOT_SUPPORTED;
         }
       });
 

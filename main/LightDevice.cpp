@@ -15,7 +15,7 @@ esp_err_t LightDevice::init() {
 
   clusters = esp_zb_zcl_cluster_list_create();
 
-  // Basic cluster (required)
+  // Basic cluster
   esp_zb_basic_cluster_cfg_t basic_cfg = {
       .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
       .power_source = config.power_source,
@@ -42,7 +42,7 @@ esp_err_t LightDevice::init() {
     return err;
   }
 
-  // Identify cluster (required)
+  // Identify cluster
   esp_zb_identify_cluster_cfg_t identify_cfg = {
       .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
   };
@@ -63,22 +63,12 @@ esp_err_t LightDevice::init() {
   if (err != ESP_OK) {
     return err;
   }
-
-  Zigbee.handle_action<esp_zb_zcl_set_attr_value_message_t>(
-      ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, config.endpoint_id,
-      ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, [this](const auto* msg) {
-        auto iter = this->attribute_handlers.find(msg->attribute.id);
-        if (iter != this->attribute_handlers.end()) {
-          auto& [_, handler] = *iter;
-          return handler(msg);
-        }
-        return ESP_OK;
-      });
+  handle_cluster_actions(ESP_ZB_ZCL_CLUSTER_ID_ON_OFF);
 
   return ESP_OK;
 }
 
-esp_zb_endpoint_config_t LightDevice::get_endpoint_config() {
+esp_zb_endpoint_config_t& LightDevice::get_endpoint_config() {
   return endpoint_config;
 }
 
@@ -94,4 +84,19 @@ void LightDevice::make_attr_string(const char* str, char* buf, size_t buf_len) {
   size_t len = std::min(strlen(str), buf_len - 1);
   buf[0] = static_cast<uint8_t>(len);
   memcpy(&buf[1], str, len);
+}
+
+void LightDevice::handle_cluster_actions(uint16_t cluster_id) {
+  Zigbee.handle_cluster(
+      config.endpoint_id, cluster_id,
+      [this](esp_zb_core_action_callback_id_t callback_id, const void* msg) {
+        ActionKey key = make_action_key(callback_id);
+        auto iter = this->action_handlers.find(key);
+        if (iter != this->action_handlers.end()) {
+          auto& [_, handler] = *iter;
+          return handler(msg);
+        }
+
+        return ESP_OK;
+      });
 }
