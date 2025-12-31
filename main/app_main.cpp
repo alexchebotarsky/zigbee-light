@@ -9,11 +9,17 @@
 constexpr int INBUILT_LED_PIN = 8;
 SingleLED led(INBUILT_LED_PIN);
 
-LightDevice light_device(LightConfig{
-    .endpoint_id = 10,
+constexpr uint8_t LIGHT_ENDPOINT_ID = 10;
+constexpr char MANUFACTURER_NAME[] = "Alex Chebotarsky";
+constexpr char MODEL_IDENTIFIER[] = "Zigbee Light Device";
+
+LightDevice light_device(DeviceConfig{
+    .endpoint = LIGHT_ENDPOINT_ID,
+    .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+    .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
     .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
-    .manufacturer = "Alex Chebotarsky",
-    .model = "Zigbee Light Device",
+    .manufacturer = MANUFACTURER_NAME,
+    .model = MODEL_IDENTIFIER,
 });
 
 extern "C" void app_main(void) {
@@ -37,7 +43,7 @@ extern "C" void app_main(void) {
 
   err = light_device.init();
   if (err != ESP_OK) {
-    printf("Error initializing LightDevice: %s\n", esp_err_to_name(err));
+    printf("Error initializing ZigbeeDevice: %s\n", esp_err_to_name(err));
     return;
   }
 
