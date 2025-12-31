@@ -36,6 +36,7 @@ class LightDevice {
   std::unordered_map<AttributeKey, AttributeHandler> attribute_handlers;
 
   const LightConfig config;
+  esp_zb_endpoint_config_t endpoint_config;
   esp_zb_cluster_list_t* clusters;
 };
 

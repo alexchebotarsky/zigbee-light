@@ -6,7 +6,7 @@
 #include "esp_zigbee_core.h"
 #include "nvs_flash.h"
 
-constexpr const int INBUILT_LED_PIN = 8;
+constexpr int INBUILT_LED_PIN = 8;
 SingleLED led(INBUILT_LED_PIN);
 
 LightDevice light_device(LightConfig{

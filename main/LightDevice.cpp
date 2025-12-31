@@ -1,11 +1,18 @@
 #include "LightDevice.hpp"
 
-constexpr const uint32_t APP_DEVICE_VERSION = 1;
+constexpr uint32_t APP_DEVICE_VERSION = 1;
 
 // PUBLIC METHODS
 LightDevice::LightDevice(const LightConfig config) : config(config) {}
 
 esp_err_t LightDevice::init() {
+  endpoint_config = esp_zb_endpoint_config_t{
+      .endpoint = config.endpoint_id,
+      .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+      .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
+      .app_device_version = APP_DEVICE_VERSION,
+  };
+
   clusters = esp_zb_zcl_cluster_list_create();
 
   // Basic cluster (required)
@@ -57,28 +64,21 @@ esp_err_t LightDevice::init() {
     return err;
   }
 
-  Zigbee.handle_action(ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, config.endpoint_id,
-                       ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
-                       [this](const esp_zb_zcl_set_attr_value_message_t* msg) {
-                         const auto iter =
-                             this->attribute_handlers.find(msg->attribute.id);
-                         if (iter != this->attribute_handlers.end()) {
-                           auto& [_, handler] = *iter;
-                           return handler(msg);
-                         }
-                         return ESP_OK;
-                       });
+  Zigbee.handle_action<esp_zb_zcl_set_attr_value_message_t>(
+      ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, config.endpoint_id,
+      ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, [this](const auto* msg) {
+        auto iter = this->attribute_handlers.find(msg->attribute.id);
+        if (iter != this->attribute_handlers.end()) {
+          auto& [_, handler] = *iter;
+          return handler(msg);
+        }
+        return ESP_OK;
+      });
 
   return ESP_OK;
 }
 
 esp_zb_endpoint_config_t LightDevice::get_endpoint_config() {
-  esp_zb_endpoint_config_t endpoint_config = {
-      .endpoint = config.endpoint_id,
-      .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
-      .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
-      .app_device_version = APP_DEVICE_VERSION,
-  };
   return endpoint_config;
 }
 

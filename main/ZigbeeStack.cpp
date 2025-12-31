@@ -3,9 +3,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-constexpr const char* TASK_NAME = "ZigbeeStack";
-constexpr int TASK_STACK_SIZE = 4096;
-constexpr int TASK_PRIORITY = 5;
+constexpr char TASK_NAME[] = "ZigbeeStack";
+constexpr uint32_t TASK_STACK_SIZE = 4096;
+constexpr uint32_t TASK_PRIORITY = 5;
 
 // Globally accessible singleton instance
 ZigbeeStack& Zigbee = ZigbeeStack::instance();
@@ -96,10 +96,11 @@ esp_err_t ZigbeeStack::core_action_handler(
     esp_zb_core_action_callback_id_t callback_id, const void* msg) {
   const auto* common = static_cast<const ActionCommonMessage*>(msg);
 
-  ActionKey key = make_action_key(callback_id, common->info.dst_endpoint,
-                                  common->info.cluster);
+  ActionKey key =
+      make_action_key(static_cast<uint32_t>(callback_id),
+                      common->info.dst_endpoint, common->info.cluster);
 
-  const auto iter = Zigbee.action_handlers.find(key);
+  auto iter = Zigbee.action_handlers.find(key);
   if (iter != Zigbee.action_handlers.end()) {
     auto& [_, handler] = *iter;
     return handler(msg);
@@ -107,16 +108,8 @@ esp_err_t ZigbeeStack::core_action_handler(
 
   printf("Unhandled action: callback_id=%lu, endpoint=%u, cluster=%u\n",
          static_cast<uint32_t>(callback_id), common->info.dst_endpoint,
-         static_cast<uint16_t>(common->info.cluster));
+         common->info.cluster);
   return ESP_ERR_NOT_SUPPORTED;
-}
-
-ActionKey ZigbeeStack::make_action_key(
-    esp_zb_core_action_callback_id_t callback_id, uint8_t endpoint_id,
-    uint16_t cluster_id) {
-  return (static_cast<uint64_t>(callback_id) << 24) |
-         (static_cast<uint64_t>(endpoint_id) << 16) |
-         static_cast<uint64_t>(cluster_id);
 }
 
 // GLOBAL ZIGBEE SIGNAL HANDLER
