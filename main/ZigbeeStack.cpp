@@ -52,20 +52,16 @@ esp_err_t ZigbeeStack::start() {
 }
 
 esp_err_t ZigbeeStack::register_endpoint(
-    esp_zb_endpoint_config_t& endpoint_config,
-    esp_zb_cluster_list_t* clusters) {
+    esp_zb_endpoint_config_t& endpoint_config, esp_zb_cluster_list_t* clusters,
+    EndpointHandler handler) {
   esp_err_t err = esp_zb_ep_list_add_ep(endpoints, clusters, endpoint_config);
   if (err != ESP_OK) {
     return err;
   }
 
-  return ESP_OK;
-}
+  endpoint_handlers.insert_or_assign(endpoint_config.endpoint, handler);
 
-void ZigbeeStack::handle_cluster(uint8_t endpoint_id, uint16_t cluster_id,
-                                 ClusterHandler handler) {
-  ClusterKey key = make_cluster_key(endpoint_id, cluster_id);
-  cluster_handlers.insert_or_assign(key, handler);
+  return ESP_OK;
 }
 
 // PRIVATE METHODS
@@ -103,18 +99,14 @@ esp_err_t ZigbeeStack::core_action_handler(
     esp_zb_core_action_callback_id_t callback_id, const void* msg) {
   const auto* common = static_cast<const ActionCommonMessage*>(msg);
 
-  ClusterKey key =
-      make_cluster_key(common->info.dst_endpoint, common->info.cluster);
-
-  auto iter = Zigbee.cluster_handlers.find(key);
-  if (iter != Zigbee.cluster_handlers.end()) {
+  auto iter = Zigbee.endpoint_handlers.find(common->info.dst_endpoint);
+  if (iter != Zigbee.endpoint_handlers.end()) {
     auto& [_, handler] = *iter;
-    return handler(callback_id, msg);
+    return handler(common->info.cluster, callback_id, msg);
   }
 
-  printf("Unhandled action: callback_id=%lu, endpoint=%u, cluster=%u\n",
-         static_cast<uint32_t>(callback_id), common->info.dst_endpoint,
-         common->info.cluster);
+  printf("Unhandled action: callback_id=%u, endpoint=%u, cluster=%u\n",
+         callback_id, common->info.dst_endpoint, common->info.cluster);
   return ESP_ERR_NOT_SUPPORTED;
 }
 

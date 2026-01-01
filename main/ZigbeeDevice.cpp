@@ -6,13 +6,6 @@ constexpr uint32_t APP_DEVICE_VERSION = 1;
 ZigbeeDevice::ZigbeeDevice(const DeviceConfig config) : config(config) {}
 
 esp_err_t ZigbeeDevice::init() {
-  endpoint_config = esp_zb_endpoint_config_t{
-      .endpoint = config.endpoint,
-      .app_profile_id = config.app_profile_id,
-      .app_device_id = config.app_device_id,
-      .app_device_version = APP_DEVICE_VERSION,
-  };
-
   clusters = esp_zb_zcl_cluster_list_create();
 
   esp_err_t err = init_basic_cluster();
@@ -25,34 +18,33 @@ esp_err_t ZigbeeDevice::init() {
     return err;
   }
 
-  err = init_clusters();
+  err = init_main_clusters();
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  esp_zb_endpoint_config_t endpoint_config = esp_zb_endpoint_config_t{
+      .endpoint = config.endpoint,
+      .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+      .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
+      .app_device_version = APP_DEVICE_VERSION,
+  };
+  EndpointHandler handler = [this](uint16_t cluster_id, uint32_t callback_id,
+                                   const void* msg) {
+    ActionKey key = make_action_key(cluster_id, callback_id);
+    auto iter = this->action_handlers.find(key);
+    if (iter != this->action_handlers.end()) {
+      auto& [_, handler] = *iter;
+      return handler(msg);
+    }
+    return ESP_OK;
+  };
+  err = Zigbee.register_endpoint(endpoint_config, clusters, handler);
   if (err != ESP_OK) {
     return err;
   }
 
   return ESP_OK;
-}
-
-esp_zb_endpoint_config_t& ZigbeeDevice::get_endpoint_config() {
-  return endpoint_config;
-}
-
-esp_zb_cluster_list_t* ZigbeeDevice::get_clusters() { return clusters; }
-
-// PROTECTED METHODS
-void ZigbeeDevice::register_cluster(uint16_t cluster_id) {
-  Zigbee.handle_cluster(
-      config.endpoint, cluster_id,
-      [this](esp_zb_core_action_callback_id_t callback_id, const void* msg) {
-        ActionKey key = make_action_key(callback_id);
-        auto iter = this->action_handlers.find(key);
-        if (iter != this->action_handlers.end()) {
-          auto& [_, handler] = *iter;
-          return handler(msg);
-        }
-
-        return ESP_OK;
-      });
 }
 
 // PRIVATE METHODS
@@ -105,6 +97,21 @@ esp_err_t ZigbeeDevice::init_identify_cluster() {
 
   esp_err_t err = esp_zb_cluster_list_add_identify_cluster(
       clusters, identify_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
+esp_err_t ZigbeeDevice::init_main_clusters() {
+  esp_zb_on_off_cluster_cfg_t on_off_cfg = {
+      .on_off = false,
+  };
+  auto* on_off_attrs = esp_zb_on_off_cluster_create(&on_off_cfg);
+
+  esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(
+      clusters, on_off_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
   if (err != ESP_OK) {
     return err;
   }
