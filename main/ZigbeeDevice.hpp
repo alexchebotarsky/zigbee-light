@@ -11,7 +11,11 @@ using ActionKey = uint64_t;
 using ActionHandler = std::function<esp_err_t(const void* msg)>;
 
 struct DeviceConfig {
+  // Required
   uint8_t endpoint;
+  uint16_t app_device_id;
+
+  // Optional
   esp_zb_zcl_basic_power_source_t power_source =
       ESP_ZB_ZCL_BASIC_POWER_SOURCE_UNKNOWN;
   const char* manufacturer = nullptr;
@@ -21,7 +25,8 @@ struct DeviceConfig {
 class ZigbeeDevice {
  public:
   ZigbeeDevice(const DeviceConfig config);
-  esp_err_t init();
+  esp_err_t init(std::function<esp_err_t()> init_clusters);
+  esp_zb_cluster_list_t* get_clusters();
 
   template <typename T>
   void handle_action(uint16_t cluster_id, uint32_t callback_id,
@@ -48,7 +53,6 @@ class ZigbeeDevice {
 
   esp_err_t init_basic_cluster();
   esp_err_t init_identify_cluster();
-  esp_err_t init_main_clusters();
 
   esp_zb_cluster_list_t* clusters;
   std::unordered_map<ActionKey, ActionHandler> action_handlers;

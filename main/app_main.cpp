@@ -6,25 +6,30 @@
 #include "esp_zigbee_core.h"
 #include "nvs_flash.h"
 
+constexpr int LED_PIN = 8;
+SingleLED led(LED_PIN);
+
 constexpr uint8_t LIGHT_ENDPOINT_ID = 10;
 constexpr char MANUFACTURER_NAME[] = "Alex Chebotarsky";
 constexpr char MODEL_IDENTIFIER[] = "Zigbee Light Device";
-
 ZigbeeDevice device(DeviceConfig{
     .endpoint = LIGHT_ENDPOINT_ID,
+    .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
     .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
     .manufacturer = MANUFACTURER_NAME,
     .model = MODEL_IDENTIFIER,
 });
 
-constexpr int LED_PIN = 8;
-
-SingleLED led(LED_PIN);
-
 extern "C" void app_main(void) {
   esp_err_t err = nvs_flash_init();
   if (err != ESP_OK) {
     printf("Error initializing NVS flash: %s\n", esp_err_to_name(err));
+    return;
+  }
+
+  err = led.init();
+  if (err != ESP_OK) {
+    printf("Error initializing SingleLED: %s\n", esp_err_to_name(err));
     return;
   }
 
@@ -34,15 +39,22 @@ extern "C" void app_main(void) {
     return;
   }
 
-  err = device.init();
+  err = device.init([]() {
+    esp_zb_on_off_cluster_cfg_t on_off_cfg = {
+        .on_off = false,
+    };
+    auto* on_off_attrs = esp_zb_on_off_cluster_create(&on_off_cfg);
+
+    esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(
+        device.get_clusters(), on_off_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    if (err != ESP_OK) {
+      return err;
+    }
+
+    return ESP_OK;
+  });
   if (err != ESP_OK) {
     printf("Error initializing ZigbeeDevice: %s\n", esp_err_to_name(err));
-    return;
-  }
-
-  err = led.init();
-  if (err != ESP_OK) {
-    printf("Error initializing SingleLED: %s\n", esp_err_to_name(err));
     return;
   }
 
