@@ -20,6 +20,20 @@ ZigbeeDevice device(DeviceConfig{
     .model = MODEL_IDENTIFIER,
 });
 
+esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
+  esp_zb_on_off_cluster_cfg_t on_off_cfg = {
+      .on_off = ESP_ZB_ZCL_ON_OFF_ON_OFF_DEFAULT_VALUE,
+  };
+  auto* on_off_attrs = esp_zb_on_off_cluster_create(&on_off_cfg);
+  esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(
+      clusters, on_off_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  return ESP_OK;
+}
+
 extern "C" void app_main(void) {
   esp_err_t err = nvs_flash_init();
   if (err != ESP_OK) {
@@ -39,20 +53,7 @@ extern "C" void app_main(void) {
     return;
   }
 
-  err = device.init([]() {
-    esp_zb_on_off_cluster_cfg_t on_off_cfg = {
-        .on_off = false,
-    };
-    auto* on_off_attrs = esp_zb_on_off_cluster_create(&on_off_cfg);
-
-    esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(
-        device.get_clusters(), on_off_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    if (err != ESP_OK) {
-      return err;
-    }
-
-    return ESP_OK;
-  });
+  err = device.init(setup_clusters);
   if (err != ESP_OK) {
     printf("Error initializing ZigbeeDevice: %s\n", esp_err_to_name(err));
     return;
@@ -71,10 +72,10 @@ extern "C" void app_main(void) {
             } else {
               return led.transition_color(0, 0, 0, 1000);
             }
-            break;
           }
           default:
-            printf("Unsupported attribute ID: %u\n", msg->attribute.id);
+            printf("Unsupported action: cluster_id=%u, attribute_id=%u\n",
+                   msg->info.cluster, msg->attribute.id);
             return ESP_ERR_NOT_SUPPORTED;
         }
       });

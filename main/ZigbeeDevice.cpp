@@ -5,20 +5,20 @@ constexpr uint32_t APP_DEVICE_VERSION = 1;
 // PUBLIC METHODS
 ZigbeeDevice::ZigbeeDevice(const DeviceConfig config) : config(config) {}
 
-esp_err_t ZigbeeDevice::init(std::function<esp_err_t()> init_clusters) {
+esp_err_t ZigbeeDevice::init(ClustersSetupHandler setup_clusters) {
   clusters = esp_zb_zcl_cluster_list_create();
 
-  esp_err_t err = init_basic_cluster();
+  esp_err_t err = setup_basic_cluster(clusters);
   if (err != ESP_OK) {
     return err;
   }
 
-  err = init_identify_cluster();
+  err = setup_identify_cluster(clusters);
   if (err != ESP_OK) {
     return err;
   }
 
-  err = init_clusters();
+  err = setup_clusters(clusters);
   if (err != ESP_OK) {
     return err;
   }
@@ -29,25 +29,23 @@ esp_err_t ZigbeeDevice::init(std::function<esp_err_t()> init_clusters) {
       .app_device_id = config.app_device_id,
       .app_device_version = APP_DEVICE_VERSION,
   };
-  EndpointHandler handler = [this](uint16_t cluster_id, uint32_t callback_id,
-                                   const void* msg) {
-    ActionKey key = make_action_key(cluster_id, callback_id);
-    auto iter = this->action_handlers.find(key);
-    if (iter != this->action_handlers.end()) {
-      auto& [_, handler] = *iter;
-      return handler(msg);
-    }
-    return ESP_OK;
-  };
-  err = Zigbee.register_endpoint(endpoint_config, clusters, handler);
+  EndpointHandler endpoint_handler =
+      [this](uint16_t cluster_id, uint32_t callback_id, const void* msg) {
+        ActionKey key = make_action_key(cluster_id, callback_id);
+        auto iter = this->action_handlers.find(key);
+        if (iter != this->action_handlers.end()) {
+          auto& [_, handler] = *iter;
+          return handler(msg);
+        }
+        return ESP_OK;
+      };
+  err = Zigbee.register_endpoint(endpoint_config, clusters, endpoint_handler);
   if (err != ESP_OK) {
     return err;
   }
 
   return ESP_OK;
 }
-
-esp_zb_cluster_list_t* ZigbeeDevice::get_clusters() { return clusters; }
 
 // PRIVATE METHODS
 void ZigbeeDevice::make_attr_str(const char* str, char* buf, size_t buf_len) {
@@ -61,7 +59,7 @@ void ZigbeeDevice::make_attr_str(const char* str, char* buf, size_t buf_len) {
   memcpy(&buf[1], str, len);
 }
 
-esp_err_t ZigbeeDevice::init_basic_cluster() {
+esp_err_t ZigbeeDevice::setup_basic_cluster(esp_zb_cluster_list_t* clusters) {
   esp_zb_basic_cluster_cfg_t basic_cfg = {
       .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
       .power_source = config.power_source,
@@ -91,7 +89,8 @@ esp_err_t ZigbeeDevice::init_basic_cluster() {
   return ESP_OK;
 }
 
-esp_err_t ZigbeeDevice::init_identify_cluster() {
+esp_err_t ZigbeeDevice::setup_identify_cluster(
+    esp_zb_cluster_list_t* clusters) {
   esp_zb_identify_cluster_cfg_t identify_cfg = {
       .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
   };
