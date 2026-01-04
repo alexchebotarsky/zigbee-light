@@ -1,5 +1,7 @@
 #include "ZigbeeStack.hpp"
 
+#include <cstdio>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -36,9 +38,7 @@ esp_err_t ZigbeeStack::init() {
           },
   };
   esp_err_t err = esp_zb_platform_config(&platform_config);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   esp_zb_core_action_handler_register(core_action_handler);
 
@@ -55,9 +55,7 @@ esp_err_t ZigbeeStack::register_endpoint(
     esp_zb_endpoint_config_t& endpoint_config, esp_zb_cluster_list_t* clusters,
     EndpointHandler handler) {
   esp_err_t err = esp_zb_ep_list_add_ep(endpoints, clusters, endpoint_config);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   endpoint_handlers.insert_or_assign(endpoint_config.endpoint, handler);
 

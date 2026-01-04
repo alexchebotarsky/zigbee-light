@@ -9,19 +9,13 @@ esp_err_t ZigbeeDevice::init(ClustersSetupHandler setup_clusters) {
   clusters = esp_zb_zcl_cluster_list_create();
 
   esp_err_t err = setup_basic_cluster(clusters);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   err = setup_identify_cluster(clusters);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   err = setup_clusters(clusters);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   esp_zb_endpoint_config_t endpoint_config = esp_zb_endpoint_config_t{
       .endpoint = config.endpoint,
@@ -40,9 +34,7 @@ esp_err_t ZigbeeDevice::init(ClustersSetupHandler setup_clusters) {
         return ESP_OK;
       };
   err = Zigbee.register_endpoint(endpoint_config, clusters, endpoint_handler);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
@@ -82,9 +74,7 @@ esp_err_t ZigbeeDevice::setup_basic_cluster(esp_zb_cluster_list_t* clusters) {
 
   esp_err_t err = esp_zb_cluster_list_add_basic_cluster(
       clusters, basic_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
@@ -98,9 +88,7 @@ esp_err_t ZigbeeDevice::setup_identify_cluster(
 
   esp_err_t err = esp_zb_cluster_list_add_identify_cluster(
       clusters, identify_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }

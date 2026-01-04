@@ -1,6 +1,7 @@
 #ifndef ZIGBEE_STACK_HPP
 #define ZIGBEE_STACK_HPP
 
+#include <cstdint>
 #include <functional>
 #include <unordered_map>
 

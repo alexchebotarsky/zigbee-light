@@ -1,6 +1,7 @@
 #ifndef ZIGBEE_DEVICE_HPP
 #define ZIGBEE_DEVICE_HPP
 
+#include <cstdint>
 #include <functional>
 #include <unordered_map>
 
