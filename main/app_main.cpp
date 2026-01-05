@@ -2,10 +2,17 @@
 #include <cstdio>
 
 #include "SingleLED.hpp"
+#include "Storage.hpp"
 #include "ZigbeeDevice.hpp"
 #include "ZigbeeStack.hpp"
 #include "esp_zigbee_core.h"
 #include "nvs_flash.h"
+
+constexpr bool DEFAULT_ACTIVE = false;
+constexpr uint8_t DEFAULT_LEVEL = 254;
+constexpr uint16_t DEFAULT_X = 10000;
+constexpr uint16_t DEFAULT_Y = 10000;
+Storage storage(DEFAULT_ACTIVE, DEFAULT_LEVEL, DEFAULT_X, DEFAULT_Y);
 
 constexpr int LED_PIN = 8;
 SingleLED led(LED_PIN);
@@ -23,7 +30,7 @@ ZigbeeDevice device(DeviceConfig{
 
 esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
   esp_zb_on_off_cluster_cfg_t on_off_cfg = {
-      .on_off = ESP_ZB_ZCL_ON_OFF_ON_OFF_DEFAULT_VALUE,
+      .on_off = storage.get_active(),
   };
   auto* on_off_attrs = esp_zb_on_off_cluster_create(&on_off_cfg);
   esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(
@@ -33,7 +40,7 @@ esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
   }
 
   esp_zb_level_cluster_cfg_t level_cfg = {
-      .current_level = ESP_ZB_ZCL_LEVEL_CONTROL_CURRENT_LEVEL_DEFAULT_VALUE,
+      .current_level = storage.get_level(),
   };
   auto* level_attrs = esp_zb_level_cluster_create(&level_cfg);
   err = esp_zb_cluster_list_add_level_cluster(clusters, level_attrs,
@@ -43,8 +50,8 @@ esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
   }
 
   esp_zb_color_cluster_cfg_t color_cfg = {
-      .current_x = ESP_ZB_ZCL_COLOR_CONTROL_CURRENT_X_DEF_VALUE,
-      .current_y = ESP_ZB_ZCL_COLOR_CONTROL_CURRENT_Y_DEF_VALUE,
+      .current_x = storage.get_color_x(),
+      .current_y = storage.get_color_y(),
       .color_mode = ESP_ZB_ZCL_COLOR_CONTROL_COLOR_MODE_DEFAULT_VALUE,
       .options = ESP_ZB_ZCL_COLOR_CONTROL_OPTIONS_DEFAULT_VALUE,
       .enhanced_color_mode =
@@ -68,7 +75,16 @@ extern "C" void app_main(void) {
     return;
   }
 
-  err = led.init();
+  err = storage.init();
+  if (err != ESP_OK) {
+    printf("Error initializing Storage: %s\n", esp_err_to_name(err));
+    return;
+  }
+
+  err = led.init(storage.get_active(),
+                 static_cast<double>(storage.get_level()) / 254.0,
+                 static_cast<double>(storage.get_color_x()) / 65535.0,
+                 static_cast<double>(storage.get_color_y()) / 65535.0);
   if (err != ESP_OK) {
     printf("Error initializing SingleLED: %s\n", esp_err_to_name(err));
     return;
@@ -91,9 +107,13 @@ extern "C" void app_main(void) {
       [](const auto* msg) {
         switch (msg->attribute.id) {
           case ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID: {
-            bool value = *static_cast<const bool*>(msg->attribute.data.value);
-            printf("Setting light to %s\n", value ? "ON" : "OFF");
-            return led.set_active(value);
+            esp_err_t err = storage.set_active(
+                *static_cast<bool*>(msg->attribute.data.value));
+            if (err != ESP_OK) return err;
+
+            bool active = storage.get_active();
+            printf("Setting active to '%s'\n", active ? "true" : "false");
+            return led.set_active(active);
           }
           default:
             printf("Unsupported action: cluster_id=%u, attribute_id=%u\n",
@@ -107,10 +127,13 @@ extern "C" void app_main(void) {
       [](const auto* msg) {
         switch (msg->attribute.id) {
           case ESP_ZB_ZCL_ATTR_LEVEL_CONTROL_CURRENT_LEVEL_ID: {
-            double brightness =
-                *static_cast<const uint8_t*>(msg->attribute.data.value) / 254.0;
-            printf("Setting brightness to %.2f\n", brightness);
-            return led.set_brightness(brightness);
+            esp_err_t err = storage.set_level(
+                *static_cast<uint8_t*>(msg->attribute.data.value));
+            if (err != ESP_OK) return err;
+
+            double level = static_cast<double>(storage.get_level()) / 254.0;
+            printf("Setting level to %.2f\n", level);
+            return led.set_level(level);
           }
           default:
             printf("Unsupported action: cluster_id=%u, attribute_id=%u\n",
@@ -124,14 +147,20 @@ extern "C" void app_main(void) {
       [](const auto* msg) {
         switch (msg->attribute.id) {
           case ESP_ZB_ZCL_ATTR_COLOR_CONTROL_CURRENT_X_ID: {
-            double x =
-                *static_cast<uint16_t*>(msg->attribute.data.value) / 65535.0;
+            esp_err_t err = storage.set_color_x(
+                *static_cast<uint16_t*>(msg->attribute.data.value));
+            if (err != ESP_OK) return err;
+
+            double x = static_cast<double>(storage.get_color_x()) / 65535.0;
             printf("Setting color X to %.2f\n", x);
             return led.set_color(x, led.get_color().y);
           }
           case ESP_ZB_ZCL_ATTR_COLOR_CONTROL_CURRENT_Y_ID: {
-            double y =
-                *static_cast<uint16_t*>(msg->attribute.data.value) / 65535.0;
+            esp_err_t err = storage.set_color_y(
+                *static_cast<uint16_t*>(msg->attribute.data.value));
+            if (err != ESP_OK) return err;
+
+            double y = static_cast<double>(storage.get_color_y()) / 65535.0;
             printf("Setting color Y to %.2f\n", y);
             return led.set_color(led.get_color().x, y);
           }

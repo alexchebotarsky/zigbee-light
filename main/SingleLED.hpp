@@ -20,15 +20,16 @@ struct ColorXY {
 class SingleLED {
  public:
   SingleLED(const int gpio_pin);
-  esp_err_t init();
+  esp_err_t init(bool active, double level, double x, double y);
+
+  esp_err_t set_active(bool active);
+  bool get_active();
+
+  esp_err_t set_level(double value);
+  double get_level();
 
   esp_err_t set_color(double x, double y);
-  esp_err_t set_brightness(double value);
-  esp_err_t set_active(bool active);
-
   ColorXY get_color();
-  double get_brightness();
-  bool is_active();
 
  private:
   esp_err_t refresh();
@@ -38,9 +39,9 @@ class SingleLED {
   const gpio_num_t gpio;
   led_strip_handle_t led;
   bool active;
+  double level;
   double x;
   double y;
-  double brightness;
 };
 
 #endif
