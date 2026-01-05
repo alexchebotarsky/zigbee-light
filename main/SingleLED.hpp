@@ -6,29 +6,41 @@
 #include "driver/gpio.h"
 #include "led_strip.h"
 
+struct ColorRGB {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
+
+struct ColorXY {
+  double x;
+  double y;
+};
+
 class SingleLED {
  public:
   SingleLED(const int gpio_pin);
   esp_err_t init();
 
-  esp_err_t set_color(uint32_t r, uint32_t g, uint32_t b);
-  esp_err_t set_brightness(float value);
-  esp_err_t transition_color(uint32_t r, uint32_t g, uint32_t b,
-                             uint32_t duration_ms);
-  esp_err_t transition_brightness(float value, uint32_t duration_ms);
+  esp_err_t set_color(double x, double y);
+  esp_err_t set_brightness(double value);
+  esp_err_t set_active(bool active);
+
+  ColorXY get_color();
+  double get_brightness();
+  bool is_active();
 
  private:
   esp_err_t refresh();
 
-  static bool is_valid_color(uint32_t r, uint32_t g, uint32_t b);
-  static bool is_valid_brightness(float value);
+  ColorRGB get_color_rgb();
 
   const gpio_num_t gpio;
   led_strip_handle_t led;
-  uint32_t red;
-  uint32_t green;
-  uint32_t blue;
-  float brightness;
+  bool active;
+  double x;
+  double y;
+  double brightness;
 };
 
 #endif

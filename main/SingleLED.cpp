@@ -1,16 +1,13 @@
 #include "SingleLED.hpp"
 
+#include <algorithm>
 #include <cmath>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 SingleLED::SingleLED(const int gpio_pin)
     : gpio(static_cast<gpio_num_t>(gpio_pin)),
-      led(nullptr),
-      red(0),
-      green(0),
-      blue(0),
+      active(false),
+      x(0.5),
+      y(0.5),
       brightness(1) {}
 
 esp_err_t SingleLED::init() {
@@ -32,147 +29,100 @@ esp_err_t SingleLED::init() {
       }};
 
   esp_err_t err = led_strip_new_rmt_device(&led_config, &rmt_config, &led);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
 
-esp_err_t SingleLED::set_color(uint32_t r, uint32_t g, uint32_t b) {
-  if (!is_valid_color(r, g, b)) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
-  red = r;
-  green = g;
-  blue = b;
+esp_err_t SingleLED::set_color(double x, double y) {
+  this->x = x;
+  this->y = y;
 
   esp_err_t err = refresh();
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
 
-esp_err_t SingleLED::set_brightness(float value) {
-  // Validate input brightness value
-  if (!is_valid_brightness(value)) {
+esp_err_t SingleLED::set_brightness(double brightness) {
+  if (brightness < 0.0 || brightness > 1.0) {
     return ESP_ERR_INVALID_ARG;
   }
 
-  brightness = value;
+  this->brightness = brightness;
 
   esp_err_t err = refresh();
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
 
-esp_err_t SingleLED::transition_color(uint32_t r, uint32_t g, uint32_t b,
-                                      uint32_t duration_ms) {
-  // Prevent division by zero
-  if (duration_ms == 0) {
-    return set_color(r, g, b);
-  }
+esp_err_t SingleLED::set_active(bool active) {
+  this->active = active;
 
-  // Validate input colors
-  if (!is_valid_color(r, g, b)) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
-  const int steps = 100;
-
-  // Duration must be divisible by steps in whole, otherwise it leads to uneven
-  // transitions.
-  if (duration_ms % steps != 0) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
-  esp_err_t err;
-
-  float initial_r = red;
-  float initial_g = green;
-  float initial_b = blue;
-
-  const int delay_ms = duration_ms / steps;
-
-  for (int i = 0; i <= steps; i++) {
-    float t = static_cast<float>(i) / steps;
-
-    red = round(initial_r + ((r - initial_r) * t));
-    green = round(initial_g + ((g - initial_g) * t));
-    blue = round(initial_b + ((b - initial_b) * t));
-
-    err = refresh();
-    if (err != ESP_OK) {
-      return err;
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(delay_ms));
-  }
+  esp_err_t err = refresh();
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
 
-esp_err_t SingleLED::transition_brightness(float value, uint32_t duration_ms) {
-  // Prevent division by zero
-  if (duration_ms == 0) {
-    return set_brightness(value);
-  }
+ColorXY SingleLED::get_color() { return ColorXY{.x = x, .y = y}; }
 
-  // Validate input brightness value
-  if (!is_valid_brightness(value)) {
-    return ESP_ERR_INVALID_ARG;
-  }
+double SingleLED::get_brightness() { return brightness; }
 
-  esp_err_t err;
-  float initial_brightness = brightness;
+bool SingleLED::is_active() { return active; }
 
-  const int steps = 100;
-  const int delay_ms = duration_ms / steps;
-
-  for (int i = 0; i <= steps; i++) {
-    float t = static_cast<float>(i) / steps;
-
-    brightness = initial_brightness + ((value - initial_brightness) * t);
-
-    err = refresh();
-    if (err != ESP_OK) {
-      return err;
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(delay_ms));
-  }
-
-  return ESP_OK;
-}
-
+// PRIVATE METHODS
 esp_err_t SingleLED::refresh() {
-  uint32_t r = static_cast<uint32_t>(round(red * brightness));
-  uint32_t g = static_cast<uint32_t>(round(green * brightness));
-  uint32_t b = static_cast<uint32_t>(round(blue * brightness));
+  ColorRGB rgb = get_color_rgb();
 
-  esp_err_t err = led_strip_set_pixel(led, 0, r, g, b);
-  if (err != ESP_OK) {
-    return err;
-  }
+  printf("Updating LED: R=%d, G=%d, B=%d\n", rgb.r, rgb.g, rgb.b);
+
+  esp_err_t err = led_strip_set_pixel(led, 0, rgb.r, rgb.g, rgb.b);
+  if (err != ESP_OK) return err;
 
   err = led_strip_refresh(led);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
 
-bool SingleLED::is_valid_color(uint32_t r, uint32_t g, uint32_t b) {
-  return (r <= 255) && (g <= 255) && (b <= 255);
-}
+ColorRGB SingleLED::get_color_rgb() {
+  if (y == 0) return ColorRGB{0, 0, 0};
 
-bool SingleLED::is_valid_brightness(float value) {
-  return (value >= 0.0f) && (value <= 1.0f);
+  // Convert xy to XYZ color space
+  double Y = 1.0;
+  double X = (Y / y) * x;
+  double Z = (Y / y) * (1.0 - x - y);
+
+  // Convert XYZ to RGB using Wide RGB D65 conversion matrix
+  double r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+  double g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+  double b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+
+  // Normalize negative values
+  if (r < 0) r = 0;
+  if (g < 0) g = 0;
+  if (b < 0) b = 0;
+
+  // Scale according to max value
+  double maxc = std::max({r, g, b});
+  if (maxc == 0) return ColorRGB{0, 0, 0};
+
+  r /= maxc;
+  g /= maxc;
+  b /= maxc;
+
+  // Apply brightness
+  r *= brightness;
+  g *= brightness;
+  b *= brightness;
+
+  // Convert to 8-bit RGB values
+  ColorRGB rgb;
+  rgb.r = static_cast<uint8_t>(std::round(r * 255.0));
+  rgb.g = static_cast<uint8_t>(std::round(g * 255.0));
+  rgb.b = static_cast<uint8_t>(std::round(b * 255.0));
+
+  return rgb;
 }
