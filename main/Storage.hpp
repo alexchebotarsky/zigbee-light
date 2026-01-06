@@ -7,27 +7,27 @@
 
 class Storage {
  public:
-  Storage(bool default_active, uint8_t default_level, uint16_t default_color_x,
-          uint16_t default_color_y);
+  Storage(bool default_active, double default_brightness,
+          double default_color_x, double default_color_y);
   esp_err_t init();
 
   esp_err_t set_active(bool active);
   bool get_active();
 
-  esp_err_t set_level(uint8_t level);
-  uint8_t get_level();
+  esp_err_t set_brightness(double brightness);
+  double get_brightness();
 
-  esp_err_t set_color_x(uint16_t color_x);
-  uint16_t get_color_x();
+  esp_err_t set_color_x(double color_x);
+  double get_color_x();
 
-  esp_err_t set_color_y(uint16_t color_y);
-  uint16_t get_color_y();
+  esp_err_t set_color_y(double color_y);
+  double get_color_y();
 
  private:
   bool active;
-  uint8_t level;
-  uint16_t color_x;
-  uint16_t color_y;
+  double brightness;
+  double color_x;
+  double color_y;
 };
 
 #endif

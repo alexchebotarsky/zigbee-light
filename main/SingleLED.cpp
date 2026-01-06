@@ -6,11 +6,11 @@
 SingleLED::SingleLED(const int gpio_pin)
     : gpio(static_cast<gpio_num_t>(gpio_pin)),
       active(false),
-      level(1),
+      brightness(1),
       x(0.5),
       y(0.5) {}
 
-esp_err_t SingleLED::init(bool active, double level, double x, double y) {
+esp_err_t SingleLED::init(bool active, double brightness, double x, double y) {
   led_strip_config_t led_config = {
       .strip_gpio_num = gpio,
       .max_leds = 1,
@@ -32,7 +32,7 @@ esp_err_t SingleLED::init(bool active, double level, double x, double y) {
   if (err != ESP_OK) return err;
 
   this->active = active;
-  this->level = level;
+  this->brightness = brightness;
   this->x = x;
   this->y = y;
 
@@ -53,12 +53,12 @@ esp_err_t SingleLED::set_active(bool active) {
 
 bool SingleLED::get_active() { return active; }
 
-esp_err_t SingleLED::set_level(double level) {
-  if (level < 0.0 || level > 1.0) {
+esp_err_t SingleLED::set_brightness(double brightness) {
+  if (brightness < 0.0 || brightness > 1.0) {
     return ESP_ERR_INVALID_ARG;
   }
 
-  this->level = level;
+  this->brightness = brightness;
 
   esp_err_t err = refresh();
   if (err != ESP_OK) return err;
@@ -66,7 +66,7 @@ esp_err_t SingleLED::set_level(double level) {
   return ESP_OK;
 }
 
-double SingleLED::get_level() { return level; }
+double SingleLED::get_brightness() { return brightness; }
 
 esp_err_t SingleLED::set_color(double x, double y) {
   this->x = x;
@@ -82,7 +82,7 @@ ColorXY SingleLED::get_color() { return ColorXY{.x = x, .y = y}; }
 
 // PRIVATE METHODS
 esp_err_t SingleLED::refresh() {
-  ColorRGB rgb = get_color_rgb();
+  ColorRGB rgb = active ? get_color_rgb() : ColorRGB{0, 0, 0};
 
   printf("Updating LED: R=%d, G=%d, B=%d\n", rgb.r, rgb.g, rgb.b);
 
@@ -121,10 +121,10 @@ ColorRGB SingleLED::get_color_rgb() {
   g /= maxc;
   b /= maxc;
 
-  // Apply level
-  r *= level;
-  g *= level;
-  b *= level;
+  // Apply brightness
+  r *= brightness;
+  g *= brightness;
+  b *= brightness;
 
   // Convert to 8-bit RGB values
   ColorRGB rgb;

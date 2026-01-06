@@ -1,0 +1,42 @@
+menu "Environment Variables"
+
+config LED_PIN
+    int "LED GPIO PIN"
+    default 8
+
+config LIGHT_ENDPOINT
+    int "Light Zigbee endpoint id"
+    default 10
+
+config LIGHT_DEFAULT_ACTIVE
+    int "Light default active state"
+    range 0 1
+    default 0
+    help
+        0 - OFF
+        1 - ON
+
+config LIGHT_DEFAULT_BRIGHTNESS
+    int "Light default brightness"
+    range 0 100
+    default 100
+
+config LIGHT_DEFAULT_COLOR_X
+    int "Light default color X coordinate"
+    range 0 100
+    default 30
+
+config LIGHT_DEFAULT_COLOR_Y
+    int "Light default color Y coordinate"
+    range 0 100
+    default 30
+
+config DEVICE_MANUFACTURER
+    string "Device manufacturer name"
+    default "Alex Chebotarsky"
+
+config DEVICE_MODEL
+    string "Device model identifier"
+    default "Zigbee Light Device"
+
+endmenu
