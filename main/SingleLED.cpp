@@ -84,8 +84,6 @@ ColorXY SingleLED::get_color() { return ColorXY{.x = x, .y = y}; }
 esp_err_t SingleLED::refresh() {
   ColorRGB rgb = active ? get_color_rgb() : ColorRGB{0, 0, 0};
 
-  printf("Updating LED: R=%d, G=%d, B=%d\n", rgb.r, rgb.g, rgb.b);
-
   esp_err_t err = led_strip_set_pixel(led, 0, rgb.r, rgb.g, rgb.b);
   if (err != ESP_OK) return err;
 
