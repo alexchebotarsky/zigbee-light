@@ -7,14 +7,14 @@
 #include "led_strip.h"
 
 struct ColorRGB {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
+  uint8_t r;  // [0,255]
+  uint8_t g;  // [0,255]
+  uint8_t b;  // [0,255]
 };
 
 struct ColorXY {
-  double x;
-  double y;
+  double x;  // [0.0,1.0]
+  double y;  // [0.0,1.0]
 };
 
 class SingleLED {
