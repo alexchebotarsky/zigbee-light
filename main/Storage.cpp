@@ -21,9 +21,7 @@ Storage::Storage(bool default_active, double default_brightness,
 esp_err_t Storage::init() {
   nvs_handle_t nvs_storage;
   esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_storage);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   uint8_t active_val;
   if (nvs_get_u8(nvs_storage, ACTIVE_NVS_KEY, &active_val) == ESP_OK) {

@@ -15,19 +15,13 @@ TemperatureSensor::TemperatureSensor(const int sda_gpio_pin,
 
 esp_err_t TemperatureSensor::init() {
   esp_err_t err = i2cdev_init();
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   err = sht4x_init_desc(&dev, I2C_NUM_0, sda_gpio, scl_gpio);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   err = sht4x_init(&dev);
-  if (err != ESP_OK) {
-    return err;
-  }
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }

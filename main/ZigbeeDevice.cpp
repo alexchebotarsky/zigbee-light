@@ -8,13 +8,13 @@ ZigbeeDevice::ZigbeeDevice(const DeviceConfig config) : config(config) {}
 esp_err_t ZigbeeDevice::init(ClustersSetupHandler setup_clusters) {
   clusters = esp_zb_zcl_cluster_list_create();
 
-  esp_err_t err = setup_basic_cluster(clusters);
+  esp_err_t err = setup_basic_cluster(clusters, config.cluster_role);
   if (err != ESP_OK) return err;
 
-  err = setup_identify_cluster(clusters);
+  err = setup_identify_cluster(clusters, config.cluster_role);
   if (err != ESP_OK) return err;
 
-  err = setup_clusters(clusters);
+  err = setup_clusters(clusters, config.cluster_role);
   if (err != ESP_OK) return err;
 
   esp_zb_endpoint_config_t endpoint_config = esp_zb_endpoint_config_t{
@@ -51,7 +51,8 @@ void ZigbeeDevice::make_attr_str(const char* str, char* buf, size_t buf_len) {
   memcpy(&buf[1], str, len);
 }
 
-esp_err_t ZigbeeDevice::setup_basic_cluster(esp_zb_cluster_list_t* clusters) {
+esp_err_t ZigbeeDevice::setup_basic_cluster(esp_zb_cluster_list_t* clusters,
+                                            uint8_t cluster_role) {
   esp_zb_basic_cluster_cfg_t basic_cfg = {
       .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
       .power_source = config.power_source,
@@ -72,22 +73,22 @@ esp_err_t ZigbeeDevice::setup_basic_cluster(esp_zb_cluster_list_t* clusters) {
         basic_attrs, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, model);
   }
 
-  esp_err_t err = esp_zb_cluster_list_add_basic_cluster(
-      clusters, basic_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+  esp_err_t err = esp_zb_cluster_list_add_basic_cluster(clusters, basic_attrs,
+                                                        cluster_role);
   if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
 
-esp_err_t ZigbeeDevice::setup_identify_cluster(
-    esp_zb_cluster_list_t* clusters) {
+esp_err_t ZigbeeDevice::setup_identify_cluster(esp_zb_cluster_list_t* clusters,
+                                               uint8_t cluster_role) {
   esp_zb_identify_cluster_cfg_t identify_cfg = {
       .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
   };
   auto* identify_attrs = esp_zb_identify_cluster_create(&identify_cfg);
 
   esp_err_t err = esp_zb_cluster_list_add_identify_cluster(
-      clusters, identify_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+      clusters, identify_attrs, cluster_role);
   if (err != ESP_OK) return err;
 
   return ESP_OK;

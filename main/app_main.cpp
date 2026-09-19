@@ -27,21 +27,21 @@ TemperatureSensor temperature_sensor(CONFIG_TEMPERATURE_SENSOR_SDA_GPIO,
 ZigbeeDevice light_device(DeviceConfig{
     .endpoint = CONFIG_LIGHT_ENDPOINT,
     .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
+    .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
     .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
     .manufacturer = CONFIG_DEVICE_MANUFACTURER,
     .model = CONFIG_DEVICE_MODEL,
 });
 
-esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
+esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters,
+                         uint8_t cluster_role) {
   esp_zb_on_off_cluster_cfg_t on_off_cfg = {
       .on_off = storage.get_active(),
   };
   auto* on_off_attrs = esp_zb_on_off_cluster_create(&on_off_cfg);
-  esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(
-      clusters, on_off_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-  if (err != ESP_OK) {
-    return err;
-  }
+  esp_err_t err = esp_zb_cluster_list_add_on_off_cluster(clusters, on_off_attrs,
+                                                         cluster_role);
+  if (err != ESP_OK) return err;
 
   esp_zb_level_cluster_cfg_t level_cfg = {
       .current_level =
@@ -49,10 +49,8 @@ esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
   };
   auto* level_attrs = esp_zb_level_cluster_create(&level_cfg);
   err = esp_zb_cluster_list_add_level_cluster(clusters, level_attrs,
-                                              ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-  if (err != ESP_OK) {
-    return err;
-  }
+                                              cluster_role);
+  if (err != ESP_OK) return err;
 
   esp_zb_color_cluster_cfg_t color_cfg = {
       .current_x =
@@ -66,11 +64,9 @@ esp_err_t setup_clusters(esp_zb_cluster_list_t* clusters) {
       .color_capabilities = 0x0008,
   };
   auto* color_attrs = esp_zb_color_control_cluster_create(&color_cfg);
-  err = esp_zb_cluster_list_add_color_control_cluster(
-      clusters, color_attrs, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-  if (err != ESP_OK) {
-    return err;
-  }
+  err = esp_zb_cluster_list_add_color_control_cluster(clusters, color_attrs,
+                                                      cluster_role);
+  if (err != ESP_OK) return err;
 
   return ESP_OK;
 }
@@ -98,7 +94,7 @@ extern "C" void app_main(void) {
   err = temperature_sensor.init();
   if (err != ESP_OK) {
     printf("Error initializing temperature sensor: %s\n", esp_err_to_name(err));
-    esp_restart();
+    return;
   }
 
   err = Zigbee.init();

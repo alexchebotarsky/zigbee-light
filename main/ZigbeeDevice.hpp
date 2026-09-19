@@ -11,13 +11,14 @@
 using ActionKey = uint64_t;
 using ActionHandler = std::function<esp_err_t(const void* msg)>;
 
-using ClustersSetupHandler =
-    std::function<esp_err_t(esp_zb_cluster_list_t* clusters)>;
+using ClustersSetupHandler = std::function<esp_err_t(
+    esp_zb_cluster_list_t* clusters, uint8_t cluster_role)>;
 
 struct DeviceConfig {
   // Required
   uint8_t endpoint;
   uint16_t app_device_id;
+  uint8_t cluster_role;
 
   // Optional
   esp_zb_zcl_basic_power_source_t power_source =
@@ -54,8 +55,10 @@ class ZigbeeDevice {
     };
   }
 
-  esp_err_t setup_basic_cluster(esp_zb_cluster_list_t* clusters);
-  esp_err_t setup_identify_cluster(esp_zb_cluster_list_t* clusters);
+  esp_err_t setup_basic_cluster(esp_zb_cluster_list_t* clusters,
+                                uint8_t cluster_role);
+  esp_err_t setup_identify_cluster(esp_zb_cluster_list_t* clusters,
+                                   uint8_t cluster_role);
 
   esp_zb_cluster_list_t* clusters;
   std::unordered_map<ActionKey, ActionHandler> action_handlers;
