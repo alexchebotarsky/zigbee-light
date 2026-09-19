@@ -30,17 +30,18 @@ esp_err_t Storage::init() {
 
   uint64_t brightness_val;
   if (nvs_get_u64(nvs_storage, BRIGHTNESS_NVS_KEY, &brightness_val) == ESP_OK) {
-    this->brightness = brightness_val / DOUBLE_SCALE_FACTOR;
+    this->brightness =
+        static_cast<double>(brightness_val) / DOUBLE_SCALE_FACTOR;
   }
 
   uint64_t color_x_val;
   if (nvs_get_u64(nvs_storage, COLOR_X_NVS_KEY, &color_x_val) == ESP_OK) {
-    this->color_x = color_x_val / DOUBLE_SCALE_FACTOR;
+    this->color_x = static_cast<double>(color_x_val) / DOUBLE_SCALE_FACTOR;
   }
 
   uint64_t color_y_val;
   if (nvs_get_u64(nvs_storage, COLOR_Y_NVS_KEY, &color_y_val) == ESP_OK) {
-    this->color_y = color_y_val / DOUBLE_SCALE_FACTOR;
+    this->color_y = static_cast<double>(color_y_val) / DOUBLE_SCALE_FACTOR;
   }
 
   nvs_close(nvs_storage);
